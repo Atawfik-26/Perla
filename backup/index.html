@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Perla</title>
+
+    <link
+        rel="stylesheet"
+        href="/static/style.css"
+    >
+
+</head>
+
+
+<body>
+
+<div class="app">
+
+
+    <aside class="sidebar">
+
+        <div class="brand">
+
+            <div class="brand-icon">
+                ✦
+            </div>
+
+            <div class="brand-name">
+                Perla
+            </div>
+
+        </div>
+
+
+        <button
+            class="new-chat"
+            id="newChat"
+        >
+
+            <span>＋</span>
+
+            محادثة جديدة
+
+        </button>
+
+
+        <div class="section-title">
+            المحادثات
+        </div>
+
+
+        <div
+            id="history"
+            class="history"
+        ></div>
+
+
+        <div class="sidebar-bottom">
+
+            <button>
+                ⚙ الإعدادات
+            </button>
+
+        </div>
+
+    </aside>
+
+
+
+    <main class="main">
+
+
+        <header class="topbar">
+
+            <div class="mobile-menu">
+                ☰
+            </div>
+
+
+            <div class="top-title">
+                بيرلا
+            </div>
+
+
+            <div
+                id="status"
+                class="status"
+            >
+
+                <span></span>
+
+                جاهزة
+
+            </div>
+
+        </header>
+
+
+
+        <section
+            id="chat"
+            class="chat"
+        >
+
+
+            <div
+                id="welcome"
+                class="welcome"
+            >
+
+                <div class="welcome-icon">
+                    ✦
+                </div>
+
+
+                <h1>
+                    أهلاً أحمد
+                </h1>
+
+
+                <p>
+                    أنا بيرلا، قولي عايز نبدأ في إيه؟
+                </p>
+
+            </div>
+
+
+        </section>
+
+
+
+        <div class="input-area">
+
+
+            <div class="input-box">
+
+
+                <textarea
+                    id="messageInput"
+                    rows="1"
+                    placeholder="اكتب رسالتك لبيرلا..."
+                ></textarea>
+
+
+                <button
+                    id="sendButton"
+                >
+                    ↑
+                </button>
+
+
+            </div>
+
+
+            <div class="input-hint">
+
+                Enter للإرسال ·
+                Shift + Enter لسطر جديد
+
+            </div>
+
+
+        </div>
+
+
+    </main>
+
+</div>
+
+
+
+<script src="/static/app.js"></script>
+
+</body>
+
+</html>

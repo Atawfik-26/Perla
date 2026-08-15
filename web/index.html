@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>بيرلا</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet"
+    >
+
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+
+
+<body>
+
+<div class="app">
+
+    <!-- ======================================
+         SIDEBAR
+    ======================================= -->
+
+    <aside class="sidebar" id="sidebar">
+
+        <div class="brand">
+            <div class="brand-orb">
+                <span class="brand-orb-core"></span>
+            </div>
+            <div>
+                <div class="brand-name">بيرلا</div>
+                <div class="brand-subtitle">مساعدتك الذكية</div>
+            </div>
+        </div>
+
+        <button class="new-chat" id="newChat" type="button">
+            <span class="new-chat-icon">＋</span>
+            <span>محادثة جديدة</span>
+        </button>
+
+        <div class="section-title">المحادثات</div>
+        <div id="history" class="history"></div>
+
+        <div class="sidebar-bottom">
+            <button id="settingsButton" type="button">
+                <span>⚙️</span> الإعدادات
+            </button>
+        </div>
+
+    </aside>
+
+
+
+    <!-- ======================================
+         MAIN
+    ======================================= -->
+
+    <main class="main">
+
+        <!-- TOP BAR -->
+
+        <header class="topbar">
+
+            <button
+                class="mobile-menu"
+                id="mobileMenu"
+                type="button"
+                aria-label="القائمة"
+            >☰</button>
+
+            <div class="top-title">
+                <div class="top-brand-orb"></div>
+                <div>
+                    <strong>بيرلا</strong>
+                    <small>جاهزة تساعدك</small>
+                </div>
+            </div>
+
+            <div class="topbar-actions">
+
+                <!-- EXPORT BUTTON -->
+                <button
+                    id="exportButton"
+                    class="export-button"
+                    type="button"
+                    title="تصدير المحادثة"
+                >
+                    📤 تصدير
+                </button>
+
+                <!-- DARK MODE TOGGLE -->
+                <button
+                    id="darkModeToggle"
+                    class="dark-mode-toggle"
+                    type="button"
+                    title="تبديل الوضع الليلي"
+                    aria-label="تبديل الوضع الليلي"
+                >
+                    🌙
+                </button>
+
+                <!-- REMINDERS BELL -->
+                <div class="reminders-wrap">
+                    <button
+                        id="remindersButton"
+                        class="icon-button"
+                        type="button"
+                        title="التذكيرات"
+                        aria-label="التذكيرات"
+                    >
+                        🔔
+                        <span id="reminderDot" class="reminder-dot" hidden></span>
+                    </button>
+
+                    <div id="remindersPanel" class="reminders-panel" hidden>
+                        <div class="reminders-panel-title">التذكيرات</div>
+                        <div id="remindersList" class="reminders-list">
+                            <div class="reminders-empty">مفيش تذكيرات دلوقتي</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="status" class="status ready">
+                    <span class="status-dot"></span>
+                    جاهزة
+                </div>
+
+            </div>
+
+        </header>
+
+
+
+        <!-- ==================================
+             CHAT
+        =================================== -->
+
+        <section id="chat" class="chat">
+
+            <div id="welcome" class="welcome">
+
+                <div class="welcome-orb">
+                    <span class="welcome-orb-core"></span>
+                    <span class="welcome-orb-ring"></span>
+                </div>
+
+                <div class="welcome-badge">بيرلا</div>
+
+                <h1>أهلاً أحمد 👋</h1>
+
+                <p>
+                    أنا بيرلا، موجودة أساعدك في أي حاجة.
+                    <br>
+                    اكتبلي، ابعت صورة أو فيديو، أو كلّمني بصوتك.
+                </p>
+
+                <div class="quick-actions">
+
+                    <button
+                        type="button"
+                        class="quick-action"
+                        data-message="ممكن تساعديني في فكرة مشروع؟"
+                    >
+                        <span>💡</span> فكرة أو مشروع
+                    </button>
+
+                    <button
+                        type="button"
+                        class="quick-action"
+                        data-message="حللي الصورة دي لو سمحت"
+                    >
+                        <span>🖼️</span> تحليل صورة
+                    </button>
+
+                    <button
+                        type="button"
+                        class="quick-action"
+                        data-message="ممكن نتكلم شوية؟"
+                    >
+                        <span>💬</span> نتكلم سوا
+                    </button>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- ==================================
+             COMPOSER
+        =================================== -->
+
+        <div class="composer-area">
+
+            <!-- MEDIA PREVIEW -->
+            <div id="filePreview" class="file-preview" hidden>
+                <div class="preview-image-wrap">
+                    <img id="previewImage" src="" alt="معاينة الصورة" hidden>
+                    <video id="previewVideo" hidden controls></video>
+                </div>
+                <div class="preview-info">
+                    <strong id="previewLabel">صورة مرفقة</strong>
+                    <span>جاهزة للإرسال</span>
+                </div>
+                <button id="removeFile" type="button" class="remove-file" title="إزالة المرفق">×</button>
+            </div>
+
+            <!-- AUDIO PREVIEW -->
+            <div id="audioPreview" class="audio-preview" hidden>
+                <div class="audio-icon">🎤</div>
+                <div class="audio-info">
+                    <strong>تسجيل صوتي</strong>
+                    <span id="recordingTime">00:00</span>
+                </div>
+                <audio id="audioPlayer" controls></audio>
+                <button id="removeAudio" type="button" class="remove-file" title="إلغاء التسجيل">×</button>
+            </div>
+
+            <!-- RECORDING BAR -->
+            <div id="recordingBar" class="recording-bar" hidden>
+                <div class="recording-pulse"></div>
+                <span>بيرلا بتسمعك...</span>
+                <strong id="recordingTimer">00:00</strong>
+                <button id="stopRecording" type="button">⏹ إيقاف</button>
+            </div>
+
+            <!-- MODE INDICATOR -->
+            <div id="planModeBar" class="plan-mode-bar" hidden>
+                <span class="plan-mode-icon">🗺️</span>
+                <span>هترسل كخطة متعددة الخطوات — بيرلا هتقسمها وتنفذها</span>
+                <button id="cancelPlanMode" type="button">إلغاء</button>
+            </div>
+
+            <!-- INPUT BOX -->
+            <div class="input-box">
+
+                <button
+                    id="attachButton"
+                    type="button"
+                    class="tool-button"
+                    title="إرفاق صورة أو فيديو"
+                >📎</button>
+
+                <input type="file" id="fileInput" accept="image/*,video/*" hidden>
+
+                <textarea
+                    id="messageInput"
+                    rows="1"
+                    placeholder="اكتب رسالتك لبيرلا..."
+                    autocomplete="off"
+                ></textarea>
+
+                <button
+                    id="planButton"
+                    type="button"
+                    class="tool-button"
+                    title="خطط ونفذ خطوة بخطوة"
+                >🗺️</button>
+
+                <button
+                    id="voiceButton"
+                    type="button"
+                    class="tool-button voice-button"
+                    title="تسجيل صوت"
+                >🎤</button>
+
+                <button
+                    id="sendButton"
+                    type="button"
+                    class="send-button"
+                    title="إرسال"
+                >↑</button>
+
+            </div>
+
+            <div class="input-hint">
+                <span>📎 صورة أو فيديو</span>
+                <span>🎤 صوت</span>
+                <span>🗺️ خطة متعددة الخطوات</span>
+                <span>Enter للإرسال</span>
+                <span>Shift + Enter لسطر جديد</span>
+            </div>
+
+        </div>
+
+    </main>
+
+</div>
+
+<div id="sidebarOverlay" class="sidebar-overlay"></div>
+
+<script src="/static/app.js"></script>
+
+</body>
+
+</html>
