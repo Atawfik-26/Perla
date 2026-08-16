@@ -3,6 +3,7 @@ uvicorn[standard]
 python-dotenv
 pydantic
 requests
+python-multipart
 SpeechRecognition
 pydub
 gtts
