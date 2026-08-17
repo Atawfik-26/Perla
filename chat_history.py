@@ -1,15 +1,11 @@
 import json
 import os
-import re
 import uuid
 from datetime import datetime
 
 
 HISTORY_FILE = "chat_history.json"
 
-# أقصى عدد محادثات محفوظة. لو اتعدى، أقدم محادثة (اللي محدش
-# فتحها أو اتكلم فيها من زمان) بتتشال تلقائيًا عشان الملف
-# متكبرش أوي ويبطئ تحميل بيرلا مع الوقت.
 MAX_CHATS = 100
 
 
@@ -59,10 +55,6 @@ def save_history(history):
 
 
 def _enforce_max_size(history):
-    """
-    لو عدد المحادثات زاد عن الحد الأقصى، نشيل أقدم محادثة
-    (حسب آخر تعديل عليها) عشان نفضي مكان للجديد.
-    """
 
     while len(history) > MAX_CHATS:
 
@@ -144,15 +136,10 @@ def add_message(
         message
     )
 
-    # كل ما يتضاف رسالة، المحادثة دي بقت "الأحدث نشاطًا"
     chat["updated_at"] = datetime.now().isoformat()
 
 
 def touch_chat(history, chat_id):
-    """
-    بتنقل المحادثة اللي اتفتحت أو اتكلم فيها لأول القايمة،
-    زي أي تطبيق شات عادي (آخر حاجة اتكلمت فيها تطلع فوق).
-    """
 
     for index, chat in enumerate(history):
 
@@ -247,107 +234,150 @@ def chat_exists(
 
 
 # =========================================================
-# CROSS-CHAT CONTEXT SEARCH (الربط بين السياقات)
+# CROSS-CHAT CONTEXT SEARCH (جديد)
 # =========================================================
 #
-# بيرلا كانت بس بتشوف المحادثة المفتوحة دلوقتي. الدالة دي
-# بتدور جوه كل المحادثات التانية عن رسايل المستخدم اللي فيها
-# كلمات مشتركة مع الرسالة الحالية، وبترجع أفضل النتايج عشان
-# تتحط كـ"سياق محتمل الصلة" في البرومبت - يعني بيرلا تقدر
-# تستفيد من حاجة اتقالت في محادثة قديمة، مش بس اللي قدامها.
+# الفكرة: لما أحمد يبعت رسالة، بندور في كل المحادثات
+# القديمة (غير المحادثة الحالية) عن رسائل فيها كلمات
+# مشتركة مع سؤاله الحالي، وبنرجع أهمهم كـ"سياق محتمل
+# يفيد الرد" - ده بيحل مشكلة إن بيرلا كانت مش بتربط
+# بين كلام امبارح وكلام النهاردة لو مكنش في محادثة واحدة.
+#
+# ملحوظة: ده بحث بسيط بالكلمات المشتركة (keyword overlap)،
+# مش بحث ذكي بالمعنى (semantic search) - يعني ممكن يفوّت
+# روابط مش فيها كلمات متطابقة حرفيًا، لكنه بداية كويسة
+# ومفيهاش تكلفة إضافية (مفيش استدعاء API زيادة).
 # =========================================================
+
+_STOPWORDS = {
+    "في", "من", "على", "الى", "إلى", "عن", "مع", "أو", "او",
+    "أن", "ان", "إن", "هو", "هي", "أنا", "انا", "إنت", "انت",
+    "انتِ", "إنتي", "انتي", "ده", "دي", "دة", "هذا", "هذه",
+    "كده", "كدا", "بس", "يا", "ايه", "إيه", "أنتِ", "زي",
+    "لو", "علشان", "عشان", "وهو", "وهي", "كان", "كانت",
+    "يكون", "بقى", "بقا", "the", "and", "for", "with", "you",
+    "your", "this", "that", "have", "what", "how",
+}
+
 
 def _tokenize(text):
 
-    if not text:
-        return set()
+    text = (text or "").lower()
 
     words = re.findall(
-        r"[\w\u0600-\u06FF]+",
-        text.lower()
+        r"[a-zA-Z\u0600-\u06FF]{3,}",
+        text
     )
 
-    return {w for w in words if len(w) > 1}
+    return [
+        w for w in words
+        if w not in _STOPWORDS
+    ]
 
 
 def search_related_context(
     history,
     query,
-    exclude_chat_id=None,
-    limit=3,
-    snippet_chars=180
+    current_chat_id=None,
+    max_snippets=3,
+    snippet_max_chars=280
 ):
+    """
+    بتدور في كل المحادثات القديمة (غير المحادثة الحالية)
+    عن أعلى الرسائل تطابقًا مع الكلمات المهمة في query،
+    وبترجع أفضل النتائج كقايمة dicts:
+    [{"chat_title": ..., "snippet": ...}, ...]
 
-    query = (query or "").strip()
+    لو مفيش تطابق كافي، بترجع قايمة فاضية - ومتأثرش على
+    باقي الرد، بيرلا هترد عادي من غير السياق الإضافي ده.
+    """
 
-    if not query:
-        return []
-
-    query_words = _tokenize(query)
+    query_words = set(_tokenize(query))
 
     if not query_words:
         return []
 
-    candidates = []
+    scored = []
 
     for chat in history:
 
-        if chat.get("id") == exclude_chat_id:
+        if chat.get("id") == current_chat_id:
             continue
 
-        title = chat.get("title", "محادثة سابقة")
+        chat_title = chat.get(
+            "title",
+            "محادثة قديمة"
+        )
 
-        for msg in chat.get("messages", []):
+        for message in chat.get("messages", []):
 
-            if msg.get("role") != "user":
+            content = message.get("content", "")
+
+            if not content or len(content) < 15:
                 continue
 
-            content = (msg.get("content") or "").strip()
+            message_words = set(_tokenize(content))
 
-            if not content:
+            overlap = query_words & message_words
+
+            if len(overlap) < 2:
                 continue
 
-            overlap = len(
-                query_words & _tokenize(content)
-            )
+            score = len(overlap)
 
-            # لازم كلمتين مشتركتين على الأقل عشان نتجنب
-            # تطابقات عشوائية (زي كلمة شايعة واحدة بس)
-            if overlap >= 2:
+            snippet = content.strip()
 
-                snippet = content
+            if len(snippet) > snippet_max_chars:
 
-                if len(snippet) > snippet_chars:
+                snippet = snippet[:snippet_max_chars] + "..."
 
-                    snippet = snippet[:snippet_chars] + "..."
+            scored.append({
 
-                candidates.append(
-                    (overlap, title, snippet)
-                )
+                "score": score,
 
-    candidates.sort(
-        key=lambda c: c[0],
+                "chat_title": chat_title,
+
+                "snippet": snippet
+
+            })
+
+    if not scored:
+        return []
+
+    scored.sort(
+
+        key=lambda item: item["score"],
+
         reverse=True
+
     )
 
-    seen = set()
+    # منع تكرار نفس المحادثة أكتر من مرة في النتايج
+    # عشان نديله تنوع بدل ما ناخد 3 جمل من نفس المحادثة
+
+    seen_chats = set()
+
     results = []
 
-    for overlap, title, snippet in candidates:
+    for item in scored:
 
-        key = (title, snippet)
-
-        if key in seen:
+        if item["chat_title"] in seen_chats:
             continue
 
-        seen.add(key)
+        seen_chats.add(item["chat_title"])
 
         results.append({
-            "title": title,
-            "snippet": snippet
+
+            "chat_title": item["chat_title"],
+
+            "snippet": item["snippet"]
+
         })
 
-        if len(results) >= limit:
+        if len(results) >= max_snippets:
             break
 
     return results
+
+
+import re  # noqa: E402 (لازم يكون فوق فعليًا - شايله هنا لسهولة اللصق، بايثون هيقبله برضه)
