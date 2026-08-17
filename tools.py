@@ -14,12 +14,6 @@ from reportlab.lib.utils import simpleSplit
 
 from pptx import Presentation
 
-try:
-    from openpyxl import Workbook
-    OPENPYXL_AVAILABLE = True
-except ImportError:
-    OPENPYXL_AVAILABLE = False
-
 
 # =========================================================
 # CONFIG
@@ -30,7 +24,7 @@ os.makedirs(FILES_DIR, exist_ok=True)
 
 
 # =========================================================
-# HELPERS
+# FILENAME
 # =========================================================
 
 def _clean_filename(text, default="perla_file"):
@@ -47,74 +41,23 @@ def _clean_filename(text, default="perla_file"):
     return text[:40] or default
 
 
-def _find_arabic_font():
-    """
-    يحاول العثور على خط Unicode موجود على ويندوز
-    يدعم العربية.
-    """
-
-    possible_fonts = [
-        r"C:\Windows\Fonts\arial.ttf",
-        r"C:\Windows\Fonts\Arial.ttf",
-        r"C:\Windows\Fonts\tahoma.ttf",
-        r"C:\Windows\Fonts\Tahoma.ttf",
-        r"C:\Windows\Fonts\segoeui.ttf",
-        r"C:\Windows\Fonts\segoeui.ttf",
-    ]
-
-    for font_path in possible_fonts:
-        if os.path.exists(font_path):
-            return font_path
-
-    return None
-
-
-PDF_FONT_NAME = "Helvetica"
-
-arabic_font_path = _find_arabic_font()
-
-if arabic_font_path:
-    try:
-        pdfmetrics.registerFont(
-            TTFont(
-                "PerlaArabic",
-                arabic_font_path
-            )
-        )
-
-        PDF_FONT_NAME = "PerlaArabic"
-
-    except Exception as error:
-        print(
-            f"[PERLA PDF] فشل تحميل الخط العربي: {repr(error)}"
-        )
-
-
 # =========================================================
-# WORD / DOCX
+# WORD
 # =========================================================
 
 def create_docx(content, title=None):
-    """
-    إنشاء ملف Word.
-    """
-
-    content = content or ""
 
     doc = Document()
 
-    # العنوان
+    # Title
     if title:
-        heading = doc.add_heading(
+        doc.add_heading(
             title,
             level=1
         )
 
-        for run in heading.runs:
-            run.font.size = Pt(18)
-
-    # المحتوى
-    for paragraph in content.split("\n"):
+    # Content
+    for paragraph in (content or "").split("\n"):
 
         paragraph = paragraph.strip()
 
@@ -131,8 +74,8 @@ def create_docx(content, title=None):
             doc.add_paragraph("")
 
     filename = (
-        f"{_clean_filename(title)}_"
-        f"{uuid.uuid4().hex[:6]}.docx"
+        f"{_clean_filename(title, 'perla_word')}_"
+        f"{uuid.uuid4().hex[:8]}.docx"
     )
 
     path = os.path.join(
@@ -142,6 +85,10 @@ def create_docx(content, title=None):
 
     doc.save(path)
 
+    print(
+        f"[PERLA FILE] Word created: {path}"
+    )
+
     return path, filename
 
 
@@ -149,19 +96,45 @@ def create_docx(content, title=None):
 # PDF
 # =========================================================
 
+def _register_arabic_font():
+
+    """
+    نحاول تسجيل خط عربي موجود على Windows.
+    لو مش موجود، نرجع لـ Helvetica.
+    """
+
+    possible_fonts = [
+        r"C:\Windows\Fonts\tahoma.ttf",
+        r"C:\Windows\Fonts\arial.ttf",
+        r"C:\Windows\Fonts\calibri.ttf",
+    ]
+
+    for font_path in possible_fonts:
+
+        if os.path.exists(font_path):
+
+            try:
+
+                pdfmetrics.registerFont(
+                    TTFont(
+                        "PerlaArabic",
+                        font_path
+                    )
+                )
+
+                return "PerlaArabic"
+
+            except Exception:
+                pass
+
+    return "Helvetica"
+
+
 def create_pdf(content, title=None):
-    """
-    إنشاء ملف PDF.
-
-    يستخدم خط Unicode إذا وجد خط مناسب
-    على الجهاز.
-    """
-
-    content = content or ""
 
     filename = (
         f"{_clean_filename(title, 'perla_pdf')}_"
-        f"{uuid.uuid4().hex[:6]}.pdf"
+        f"{uuid.uuid4().hex[:8]}.pdf"
     )
 
     path = os.path.join(
@@ -180,16 +153,18 @@ def create_pdf(content, title=None):
 
     y = height - margin
 
-    font_size = 12
+    font_name = _register_arabic_font()
 
-    font_name = PDF_FONT_NAME
+    font_size = 12
 
     c.setFont(
         font_name,
         font_size
     )
 
-    max_width = width - (2 * margin)
+    max_width = width - (
+        2 * margin
+    )
 
     # -----------------------------------------------------
     # TITLE
@@ -199,37 +174,16 @@ def create_pdf(content, title=None):
 
         c.setFont(
             font_name,
-            16
+            18
         )
 
-        title_lines = simpleSplit(
-            title,
-            font_name,
-            16,
-            max_width
+        c.drawString(
+            margin,
+            y,
+            title
         )
 
-        for line in title_lines:
-
-            if y < margin:
-                c.showPage()
-
-                c.setFont(
-                    font_name,
-                    16
-                )
-
-                y = height - margin
-
-            c.drawString(
-                margin,
-                y,
-                line
-            )
-
-            y -= 0.8 * cm
-
-        y -= 0.5 * cm
+        y -= 1.5 * cm
 
         c.setFont(
             font_name,
@@ -240,25 +194,13 @@ def create_pdf(content, title=None):
     # CONTENT
     # -----------------------------------------------------
 
-    for raw_line in content.split("\n"):
+    for raw_line in (content or "").split("\n"):
 
         raw_line = raw_line.strip()
 
-        # سطر فاضي
         if not raw_line:
 
             y -= 0.4 * cm
-
-            if y < margin:
-
-                c.showPage()
-
-                c.setFont(
-                    font_name,
-                    font_size
-                )
-
-                y = height - margin
 
             continue
 
@@ -274,6 +216,7 @@ def create_pdf(content, title=None):
 
         for line in lines:
 
+            # New page
             if y < margin:
 
                 c.showPage()
@@ -291,9 +234,13 @@ def create_pdf(content, title=None):
                 line
             )
 
-            y -= 0.6 * cm
+            y -= 0.65 * cm
 
     c.save()
+
+    print(
+        f"[PERLA FILE] PDF created: {path}"
+    )
 
     return path, filename
 
@@ -303,96 +250,95 @@ def create_pdf(content, title=None):
 # =========================================================
 
 def create_pptx(content, title=None):
-    """
-    إنشاء عرض PowerPoint.
-    """
-
-    content = content or ""
 
     prs = Presentation()
 
     # -----------------------------------------------------
-    # تقسيم المحتوى إلى أجزاء
+    # Split content into sections
     # -----------------------------------------------------
 
     parts = [
         p.strip()
-        for p in content.split("\n\n")
+        for p in (content or "").split("\n\n")
         if p.strip()
     ]
 
-    slides_data = [
-        {
-            "title": f"نقطة {i + 1}",
-            "content": part
-        }
+    # لو المحتوى كله فقرة واحدة
+    if not parts:
 
-        for i, part in enumerate(parts)
-    ]
-
-    if not slides_data:
-
-        slides_data = [
-            {
-                "title": title or "بيرلا",
-                "content": content
-            }
+        parts = [
+            content or "عرض تقديمي بيرلا"
         ]
 
     # -----------------------------------------------------
-    # TITLE SLIDE
+    # Title slide
     # -----------------------------------------------------
 
-    title_slide_layout = prs.slide_layouts[0]
+    title_slide_layout = (
+        prs.slide_layouts[0]
+    )
 
     title_slide = prs.slides.add_slide(
         title_slide_layout
     )
 
-    if title_slide.shapes.title:
+    title_shape = title_slide.shapes.title
 
-        title_slide.shapes.title.text = (
+    if title_shape:
+
+        title_shape.text = (
             title or "عرض تقديمي"
         )
 
     # -----------------------------------------------------
-    # CONTENT SLIDES
+    # Content slides
     # -----------------------------------------------------
 
-    content_slide_layout = prs.slide_layouts[1]
+    content_slide_layout = (
+        prs.slide_layouts[1]
+    )
 
-    for item in slides_data:
+    for index, part in enumerate(parts):
 
         slide = prs.slides.add_slide(
             content_slide_layout
         )
 
+        # Slide title
         if slide.shapes.title:
 
             slide.shapes.title.text = (
-                item["title"]
+                f"نقطة {index + 1}"
             )
 
-        if len(slide.placeholders) > 1:
+        # Content
+        try:
 
-            text_frame = (
+            placeholder = (
                 slide.placeholders[1]
-                .text_frame
             )
 
-            text_frame.clear()
+            placeholder.text_frame.text = part
 
-            text_frame.text = (
-                item["content"]
+        except Exception:
+
+            # لو الـlayout مختلف
+            textbox = slide.shapes.add_textbox(
+                cm,
+                4 * cm,
+                width=width if "width" in locals() else 20 * cm,
+                height=10 * cm
             )
+
+            textbox.text_frame.text = part
 
     # -----------------------------------------------------
-    # SAVE
+    # Save
     # -----------------------------------------------------
 
     filename = (
         f"{_clean_filename(title, 'perla_pptx')}_"
-        f"{uuid.uuid4().hex[:6]}.pptx"
+        f"{uuid.uuid4().hex[:8]}.pptx"
     )
 
     path = os.path.join(
@@ -402,121 +348,8 @@ def create_pptx(content, title=None):
 
     prs.save(path)
 
-    return path, filename
-
-
-# =========================================================
-# EXCEL
-# =========================================================
-
-def create_xlsx(content, title=None):
-    """
-    إنشاء ملف Excel بسيط.
-
-    كل سطر في المحتوى يصبح صفًا.
-    لو السطر يحتوي على | يتم تقسيمه إلى أعمدة.
-    """
-
-    if not OPENPYXL_AVAILABLE:
-
-        raise RuntimeError(
-            "مكتبة openpyxl مش مثبتة. "
-            "ثبتها بالأمر: pip install openpyxl"
-        )
-
-    content = content or ""
-
-    workbook = Workbook()
-
-    worksheet = workbook.active
-
-    worksheet.title = "بيرلا"
-
-    # -----------------------------------------------------
-    # TITLE
-    # -----------------------------------------------------
-
-    if title:
-
-        worksheet.append([
-            title
-        ])
-
-    # -----------------------------------------------------
-    # CONTENT
-    # -----------------------------------------------------
-
-    lines = content.splitlines()
-
-    for line in lines:
-
-        line = line.strip()
-
-        if not line:
-            continue
-
-        # دعم الجداول البسيطة:
-        # اسم | السن | الوظيفة
-
-        if "|" in line:
-
-            columns = [
-                cell.strip()
-                for cell in line.split("|")
-            ]
-
-            worksheet.append(
-                columns
-            )
-
-        else:
-
-            worksheet.append([
-                line
-            ])
-
-    # -----------------------------------------------------
-    # COLUMN WIDTH
-    # -----------------------------------------------------
-
-    for column_cells in worksheet.columns:
-
-        max_length = 0
-
-        column_letter = (
-            column_cells[0].column_letter
-        )
-
-        for cell in column_cells:
-
-            value = str(
-                cell.value or ""
-            )
-
-            if len(value) > max_length:
-                max_length = len(value)
-
-        worksheet.column_dimensions[
-            column_letter
-        ].width = min(
-            max(max_length + 2, 12),
-            50
-        )
-
-    # -----------------------------------------------------
-    # SAVE
-    # -----------------------------------------------------
-
-    filename = (
-        f"{_clean_filename(title, 'perla_excel')}_"
-        f"{uuid.uuid4().hex[:6]}.xlsx"
+    print(
+        f"[PERLA FILE] PowerPoint created: {path}"
     )
-
-    path = os.path.join(
-        FILES_DIR,
-        filename
-    )
-
-    workbook.save(path)
 
     return path, filename
