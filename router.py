@@ -13,6 +13,10 @@ class PerlaRouter:
 
         message = (message or "").lower().strip()
 
+        # =====================================================
+        # MULTIMODAL INPUT
+        # =====================================================
+
         if has_audio:
             return "audio"
 
@@ -22,40 +26,189 @@ class PerlaRouter:
         if has_image:
             return "vision"
 
+        # =====================================================
+        # FILE: WORD / DOCX
+        # =====================================================
+
         word_patterns = [
-            "ملف وورد", "وورد", "مستند وورد", "docx",
-            "اعمل ملف وورد", "ابعتلي وورد", "اكتبه في وورد",
-            "حول ده لوورد", "طلعلي وورد",
+            "ملف وورد",
+            "وورد",
+            "مستند وورد",
+            "word",
+            "docx",
+            "اعمل ملف وورد",
+            "اعملي ملف وورد",
+            "ابعتلي وورد",
+            "اكتبلي وورد",
+            "اكتبه في وورد",
+            "حوله لوورد",
+            "حوله لورد",
+            "حول ده لوورد",
+            "طلعلي وورد",
+            "ملف word",
         ]
 
-        if self._contains_any(message, word_patterns):
+        if self._contains_any(
+            message,
+            word_patterns
+        ):
             return "file_word"
 
+        # =====================================================
+        # FILE: PDF
+        # =====================================================
+
         pdf_patterns = [
-            "بي دي اف", "بي دى اف", "pdf",
-            "ملف pdf", "اعمل ملف pdf", "طلعلي pdf", "حوله pdf",
+            "بي دي اف",
+            "بي دى اف",
+            "pdf",
+            "ملف pdf",
+            "اعمل ملف pdf",
+            "اعملي ملف pdf",
+            "ابعتلي pdf",
+            "اكتبلي pdf",
+            "حوله pdf",
+            "حوله ل pdf",
+            "حول ده pdf",
+            "طلعلي pdf",
+            "ملف بي دي اف",
         ]
 
-        if self._contains_any(message, pdf_patterns):
+        if self._contains_any(
+            message,
+            pdf_patterns
+        ):
             return "file_pdf"
 
+        # =====================================================
+        # FILE: POWERPOINT
+        # =====================================================
+
         pptx_patterns = [
-            "باوربوينت", "بوربوينت", "بور بوينت", "بريزنتيشن",
-            "عرض تقديمي", "pptx", "سلايدات", "سلايد شو",
-            "اعمل عرض", "اعمل برزنتيشن",
+            "باوربوينت",
+            "باور بوينت",
+            "بوربوينت",
+            "بور بوينت",
+            "powerpoint",
+            "power point",
+            "بريزنتيشن",
+            "presentation",
+            "عرض تقديمي",
+            "pptx",
+            "سلايدات",
+            "سلايدز",
+            "سلايد شو",
+            "اعمل عرض",
+            "اعملي عرض",
+            "اعمل برزنتيشن",
+            "اعملي برزنتيشن",
         ]
 
-        if self._contains_any(message, pptx_patterns):
+        if self._contains_any(
+            message,
+            pptx_patterns
+        ):
             return "file_pptx"
 
-        image_gen_patterns = [
-            "ولد صورة", "ولدلي صورة", "اعملي صورة", "اعمل صورة",
-            "صمملي صورة", "ارسم", "ارسملي", "طلعلي صورة",
-            "generate image", "image generation",
+        # =====================================================
+        # FILE: EXCEL
+        # =====================================================
+
+        excel_patterns = [
+            "اكسل",
+            "إكسل",
+            "excel",
+            "xlsx",
+            "ملف اكسل",
+            "ملف إكسل",
+            "جدول اكسل",
+            "جدول إكسل",
+            "اعمل اكسل",
+            "اعملي اكسل",
+            "اعمل ملف اكسل",
+            "اعملي ملف اكسل",
+            "حول ده لاكسل",
+            "حوله لاكسل",
         ]
 
-        if self._contains_any(message, image_gen_patterns):
+        if self._contains_any(
+            message,
+            excel_patterns
+        ):
+            return "file_excel"
+
+        # =====================================================
+        # IMAGE GENERATION
+        # =====================================================
+
+        image_gen_patterns = [
+            "ولد صورة",
+            "ولدلي صورة",
+            "ولّد صورة",
+            "ولدي صورة",
+            "اعملي صورة",
+            "اعمل صورة",
+            "اعمللي صورة",
+            "صمملي صورة",
+            "صمم لي صورة",
+            "صمم صورة",
+            "صورة جديدة",
+            "اعمل تصميم",
+            "اعملي تصميم",
+            "ارسم",
+            "ارسملي",
+            "ارسم لي",
+            "اصنع صورة",
+            "اصنعلي صورة",
+            "انشئ صورة",
+            "أنشئ صورة",
+            "إنشاء صورة",
+            "توليد صورة",
+            "ولدلي تصميم",
+            "generate image",
+            "generate a picture",
+            "image generation",
+            "create image",
+            "create a picture",
+            "make an image",
+        ]
+
+        if self._contains_any(
+            message,
+            image_gen_patterns
+        ):
             return "image_generate"
+
+        # =====================================================
+        # VIDEO GENERATION
+        # =====================================================
+
+        video_generation_patterns = [
+            "ولد فيديو",
+            "ولّد فيديو",
+            "ولدلي فيديو",
+            "اعملي فيديو",
+            "اعمل فيديو",
+            "اعمللي فيديو",
+            "صمم فيديو",
+            "انشئ فيديو",
+            "أنشئ فيديو",
+            "إنشاء فيديو",
+            "توليد فيديو",
+            "generate video",
+            "create video",
+            "make a video",
+        ]
+
+        if self._contains_any(
+            message,
+            video_generation_patterns
+        ):
+            return "video_generate"
+
+        # =====================================================
+        # CODING
+        # =====================================================
 
         coding_patterns = [
             r"\bpython\b",
@@ -72,6 +225,7 @@ class PerlaRouter:
             r"\bbug\b",
             r"\bdebug\b",
             r"\berror\b",
+
             "كود",
             "الكود",
             "برمجة",
@@ -91,14 +245,22 @@ class PerlaRouter:
             "برمج",
         ]
 
-        if self._contains_any(message, coding_patterns):
+        if self._contains_any(
+            message,
+            coding_patterns
+        ):
             return "coding"
+
+        # =====================================================
+        # MATH
+        # =====================================================
 
         math_patterns = [
             r"(?<!\d)\d{1,6}\s*[\+\-\*/]\s*\d{1,6}(?!\d)",
             r"\d+\s*%\s*(من|of)?\s*\d+",
             r"\d+\s*÷\s*\d+",
             r"\d+\s*×\s*\d+",
+
             "احسب",
             "احسبي",
             "حساب",
@@ -118,8 +280,15 @@ class PerlaRouter:
             "احتمال رياضي",
         ]
 
-        if self._contains_any(message, math_patterns):
+        if self._contains_any(
+            message,
+            math_patterns
+        ):
             return "math"
+
+        # =====================================================
+        # RESEARCH
+        # =====================================================
 
         research_patterns = [
             "ابحث",
@@ -149,8 +318,15 @@ class PerlaRouter:
             "اخر سعر",
         ]
 
-        if self._contains_any(message, research_patterns):
+        if self._contains_any(
+            message,
+            research_patterns
+        ):
             return "research"
+
+        # =====================================================
+        # REASONING
+        # =====================================================
 
         reasoning_patterns = [
             "حلل",
@@ -182,8 +358,15 @@ class PerlaRouter:
             "اعمل مقارنة",
         ]
 
-        if self._contains_any(message, reasoning_patterns):
+        if self._contains_any(
+            message,
+            reasoning_patterns
+        ):
             return "reasoning"
+
+        # =====================================================
+        # CREATIVE
+        # =====================================================
 
         creative_patterns = [
             "اكتبلي",
@@ -209,25 +392,51 @@ class PerlaRouter:
             "كونتنت",
         ]
 
-        if self._contains_any(message, creative_patterns):
+        if self._contains_any(
+            message,
+            creative_patterns
+        ):
             return "creative"
 
-        word_count = len(message.split())
+        # =====================================================
+        # DEFAULT
+        # =====================================================
+
+        word_count = len(
+            message.split()
+        )
 
         if word_count >= 25:
             return "reasoning"
 
         return "fast"
 
+    # =====================================================
+    # MATCHER
+    # =====================================================
+
     @staticmethod
-    def _contains_any(message, patterns):
+    def _contains_any(
+        message,
+        patterns
+    ):
+
         for pattern in patterns:
+
             try:
-                if re.search(pattern, message, re.IGNORECASE):
+
+                if re.search(
+                    pattern,
+                    message,
+                    re.IGNORECASE
+                ):
                     return True
+
             except re.error:
+
                 if pattern in message:
                     return True
+
         return False
 
 
