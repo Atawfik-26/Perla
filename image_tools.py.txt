@@ -1,0 +1,194 @@
+import os
+import uuid
+import base64
+import requests
+
+from dotenv import load_dotenv
+
+load_dotenv()
+
+
+# =========================================================
+# CONFIG
+# =========================================================
+
+FILES_DIR = "files"
+os.makedirs(FILES_DIR, exist_ok=True)
+
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+
+IMAGE_MODEL = os.getenv(
+    "PERLA_IMAGE_MODEL",
+    "google/gemini-2.5-flash-image"
+)
+
+
+# =========================================================
+# API KEY
+# =========================================================
+
+def get_api_key():
+    return os.getenv("OPENROUTER_API_KEY")
+
+
+# =========================================================
+# IMAGE GENERATION
+# =========================================================
+
+def generate_image(
+    prompt,
+    aspect_ratio="1:1"
+):
+    """
+    توليد صورة عن طريق OpenRouter
+    باستخدام نفس OPENROUTER_API_KEY
+    """
+
+    api_key = get_api_key()
+
+    if not api_key:
+        raise RuntimeError(
+            "مفيش OPENROUTER_API_KEY في ملف .env."
+        )
+
+    prompt = (prompt or "").strip()
+
+    if not prompt:
+        raise ValueError(
+            "وصف الصورة فاضي."
+        )
+
+    print("\n========== PERLA IMAGE ==========")
+    print(f"[IMAGE MODEL] {IMAGE_MODEL}")
+    print(f"[IMAGE PROMPT] {prompt}")
+    print("=================================\n")
+
+    try:
+
+        response = requests.post(
+            f"{OPENROUTER_BASE_URL}/images",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": IMAGE_MODEL,
+                "prompt": prompt,
+                "aspect_ratio": aspect_ratio,
+                "n": 1,
+            },
+            timeout=180,
+        )
+
+    except requests.RequestException as error:
+
+        raise RuntimeError(
+            f"حصل خطأ أثناء الاتصال بـ OpenRouter: {error}"
+        )
+
+    # =====================================================
+    # ERROR
+    # =====================================================
+
+    if response.status_code != 200:
+
+        try:
+            error_data = response.json()
+        except Exception:
+            error_data = response.text
+
+        raise RuntimeError(
+            f"OpenRouter رفض توليد الصورة.\n"
+            f"Status: {response.status_code}\n"
+            f"Response: {error_data}"
+        )
+
+    # =====================================================
+    # RESPONSE
+    # =====================================================
+
+    try:
+        data = response.json()
+    except Exception as error:
+
+        raise RuntimeError(
+            f"OpenRouter رجع استجابة مش مفهومة: {error}"
+        )
+
+    if not data.get("data"):
+        raise RuntimeError(
+            f"OpenRouter مرجعش صورة.\nResponse: {data}"
+        )
+
+    image_entry = data["data"][0]
+
+    # =====================================================
+    # BASE64 IMAGE
+    # =====================================================
+
+    b64_image = image_entry.get("b64_json")
+
+    if not b64_image:
+
+        raise RuntimeError(
+            f"OpenRouter رجع بيانات من غير b64_json.\n"
+            f"Response: {data}"
+        )
+
+    media_type = image_entry.get(
+        "media_type",
+        "image/png"
+    )
+
+    if "jpeg" in media_type or "jpg" in media_type:
+        extension = ".jpg"
+
+    elif "webp" in media_type:
+        extension = ".webp"
+
+    else:
+        extension = ".png"
+
+    try:
+
+        image_bytes = base64.b64decode(
+            b64_image
+        )
+
+    except Exception as error:
+
+        raise RuntimeError(
+            f"فشل فك الصورة من Base64: {error}"
+        )
+
+    # =====================================================
+    # SAVE FILE
+    # =====================================================
+
+    filename = (
+        f"perla_image_"
+        f"{uuid.uuid4().hex[:10]}"
+        f"{extension}"
+    )
+
+    path = os.path.join(
+        FILES_DIR,
+        filename
+    )
+
+    try:
+
+        with open(path, "wb") as file:
+            file.write(image_bytes)
+
+    except Exception as error:
+
+        raise RuntimeError(
+            f"فشل حفظ الصورة: {error}"
+        )
+
+    print(
+        f"[PERLA IMAGE] تم إنشاء الصورة: {path}"
+    )
+
+    return path, filename
