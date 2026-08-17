@@ -1,10 +1,6 @@
 import re
 
 
-# =========================================================
-# PERLA SMART MODEL ROUTER
-# =========================================================
-
 class PerlaRouter:
 
     def choose(
@@ -17,10 +13,6 @@ class PerlaRouter:
 
         message = (message or "").lower().strip()
 
-        # =================================================
-        # 1. MEDIA HAS PRIORITY
-        # =================================================
-
         if has_audio:
             return "audio"
 
@@ -30,9 +22,40 @@ class PerlaRouter:
         if has_image:
             return "vision"
 
-        # =================================================
-        # 2. CODING
-        # =================================================
+        word_patterns = [
+            "ملف وورد", "وورد", "مستند وورد", "docx",
+            "اعمل ملف وورد", "ابعتلي وورد", "اكتبه في وورد",
+            "حول ده لوورد", "طلعلي وورد",
+        ]
+
+        if self._contains_any(message, word_patterns):
+            return "file_word"
+
+        pdf_patterns = [
+            "بي دي اف", "بي دى اف", "pdf",
+            "ملف pdf", "اعمل ملف pdf", "طلعلي pdf", "حوله pdf",
+        ]
+
+        if self._contains_any(message, pdf_patterns):
+            return "file_pdf"
+
+        pptx_patterns = [
+            "باوربوينت", "بوربوينت", "بور بوينت", "بريزنتيشن",
+            "عرض تقديمي", "pptx", "سلايدات", "سلايد شو",
+            "اعمل عرض", "اعمل برزنتيشن",
+        ]
+
+        if self._contains_any(message, pptx_patterns):
+            return "file_pptx"
+
+        image_gen_patterns = [
+            "ولد صورة", "ولدلي صورة", "اعملي صورة", "اعمل صورة",
+            "صمملي صورة", "ارسم", "ارسملي", "طلعلي صورة",
+            "generate image", "image generation",
+        ]
+
+        if self._contains_any(message, image_gen_patterns):
+            return "image_generate"
 
         coding_patterns = [
             r"\bpython\b",
@@ -49,7 +72,6 @@ class PerlaRouter:
             r"\bbug\b",
             r"\bdebug\b",
             r"\berror\b",
-
             "كود",
             "الكود",
             "برمجة",
@@ -69,22 +91,14 @@ class PerlaRouter:
             "برمج",
         ]
 
-        if self._contains_any(
-            message,
-            coding_patterns
-        ):
+        if self._contains_any(message, coding_patterns):
             return "coding"
-
-        # =================================================
-        # 3. MATH
-        # =================================================
 
         math_patterns = [
             r"(?<!\d)\d{1,6}\s*[\+\-\*/]\s*\d{1,6}(?!\d)",
             r"\d+\s*%\s*(من|of)?\s*\d+",
             r"\d+\s*÷\s*\d+",
             r"\d+\s*×\s*\d+",
-
             "احسب",
             "احسبي",
             "حساب",
@@ -104,15 +118,8 @@ class PerlaRouter:
             "احتمال رياضي",
         ]
 
-        if self._contains_any(
-            message,
-            math_patterns
-        ):
+        if self._contains_any(message, math_patterns):
             return "math"
-
-        # =================================================
-        # 4. RESEARCH
-        # =================================================
 
         research_patterns = [
             "ابحث",
@@ -142,15 +149,8 @@ class PerlaRouter:
             "اخر سعر",
         ]
 
-        if self._contains_any(
-            message,
-            research_patterns
-        ):
+        if self._contains_any(message, research_patterns):
             return "research"
-
-        # =================================================
-        # 5. DEEP REASONING / ANALYSIS
-        # =================================================
 
         reasoning_patterns = [
             "حلل",
@@ -182,15 +182,8 @@ class PerlaRouter:
             "اعمل مقارنة",
         ]
 
-        if self._contains_any(
-            message,
-            reasoning_patterns
-        ):
+        if self._contains_any(message, reasoning_patterns):
             return "reasoning"
-
-        # =================================================
-        # 6. CREATIVE
-        # =================================================
 
         creative_patterns = [
             "اكتبلي",
@@ -216,23 +209,8 @@ class PerlaRouter:
             "كونتنت",
         ]
 
-        if self._contains_any(
-            message,
-            creative_patterns
-        ):
+        if self._contains_any(message, creative_patterns):
             return "creative"
-
-        # =================================================
-        # 7. DEFAULT - LENGTH-AWARE FALLBACK
-        # =================================================
-        #
-        # قبل كده أي رسالة مفيهاش كلمة مفتاحية واضحة كانت
-        # بتروح لـ"fast" (الموديل الأسرع/الأبسط) تلقائيًا،
-        # حتى لو الرسالة طويلة ومعقدة ومحتاجة موديل أقوى
-        # في الفهم. دلوقتي: لو الرسالة طويلة نسبيًا (25 كلمة
-        # فأكتر) من غير ما تطابق أي تصنيف تاني، بنوجهها لـ
-        # "reasoning" بدل "fast".
-        # =================================================
 
         word_count = len(message.split())
 
@@ -241,62 +219,16 @@ class PerlaRouter:
 
         return "fast"
 
-
-    # =====================================================
-    # HELPER
-    # =====================================================
-
     @staticmethod
-    def _contains_any(
-        message,
-        patterns
-    ):
-
+    def _contains_any(message, patterns):
         for pattern in patterns:
-
             try:
-
-                if re.search(
-                    pattern,
-                    message,
-                    re.IGNORECASE
-                ):
+                if re.search(pattern, message, re.IGNORECASE):
                     return True
-
             except re.error:
-
                 if pattern in message:
                     return True
-
         return False
 
 
-# =========================================================
-# SINGLE ROUTER INSTANCE
-# =========================================================
-
 router = PerlaRouter()
-
-
-# =========================================================
-# TEST
-# =========================================================
-
-if __name__ == "__main__":
-
-    r = PerlaRouter()
-
-    tests = [
-        "عامل إزاي؟",
-        "إزاي حالك",
-        "احسب 5 + 3",
-        "رقم تليفوني 0100123456",
-        "حلل السوق بتاع البراند ده",
-        "اكتبلي بوست عن الشتا",
-        "صلح الكود ده فيه bug",
-        "ابحث عن أسعار الدولار",
-        "عايز أعمل بحث علمي عن تأثير قلة النوم على التركيز والذاكرة عند الطلاب في الجامعة",
-    ]
-
-    for t in tests:
-        print(f"{t:35} -> {r.choose(t)}")
