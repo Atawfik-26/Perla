@@ -17,6 +17,8 @@ from brain import think
 from planner import plan_task, needs_planning
 from router import router
 from model_selector import get_model_candidates
+from file_tools import create_docx, create_pdf, create_pptx
+from image_tools import generate_image
 
 from memory import (
     load_memory, save_memory, add_memory, remove_memory,
@@ -28,12 +30,10 @@ from chat_history import (
     get_chat, get_recent_messages, delete_chat, touch_chat
 )
 
-# ====== VOICE (مجاني - voice_free) ======
 from voice_free import transcribe_audio, text_to_speech, voice_chat_pipeline
 
 app = FastAPI(title="Perla")
 
-# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -42,7 +42,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Rate Limiting
 RATE_LIMIT_REQUESTS = 30
 RATE_LIMIT_WINDOW = 60
 request_counts = defaultdict(list)
@@ -57,7 +56,6 @@ async def rate_limit_middleware(request: Request, call_next):
     request_counts[client_ip].append(now)
     return await call_next(request)
 
-# Data
 memory = load_memory()
 history = load_history()
 
@@ -66,18 +64,19 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 FILES_DIR = "files"
 os.makedirs(FILES_DIR, exist_ok=True)
 
-# Default Chat
+FILE_TASK_TYPES = {"file_word", "file_pdf", "file_pptx"}
+IMAGE_TASK_TYPE = "image_generate"
+
 if not history:
     active_chat = create_chat(history, "محادثة جديدة")
     save_history(history)
 else:
     active_chat = history[0]
 
-# Static
 app.mount("/static", StaticFiles(directory="web"), name="static")
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
+app.mount("/files", StaticFiles(directory=FILES_DIR), name="files")
 
-# Models
 class Message(BaseModel):
     message: str
 
@@ -88,7 +87,39 @@ class ReminderItem(BaseModel):
     item: str
     remind_on: str
 
-# Pages
+
+def handle_file_generation(message, memory, recent_history, history, task_type):
+    content = think(
+        f"اكتب محتوى جاهز بس (من غير مقدمات زي 'اكيد' أو 'تمام') عشان يتحط في ملف عن الطلب ده: {message}",
+        memory, recent_history, history_obj=history, task_type="creative"
+    )
+
+    title = message.strip()[:50]
+
+    if task_type == "file_word":
+        path, filename = create_docx(content, title=title)
+    elif task_type == "file_pdf":
+        path, filename = create_pdf(content, title=title)
+    elif task_type == "file_pptx":
+        path, filename = create_pptx(content, title=title)
+    else:
+        raise ValueError("نوع ملف غير معروف")
+
+    file_url = f"/files/{filename}"
+    reply = f"جهزتلك الملف يا تيتو ✅\nتقدر تنزله من هنا: {file_url}"
+    return reply, file_url
+
+
+def handle_image_generation(message):
+    try:
+        path, filename = generate_image(message)
+        file_url = f"/files/{filename}"
+        reply = f"جهزتلك الصورة يا تيتو 🖼️\n{file_url}"
+        return reply, file_url
+    except Exception as e:
+        return f"معرفتش أولد الصورة: {str(e)}", None
+
+
 @app.get("/")
 def home(): return FileResponse("web/index.html")
 
@@ -102,7 +133,6 @@ def health():
 @app.get("/current-chat")
 def current_chat(): return {"chat": active_chat}
 
-# Chats
 @app.get("/chats")
 def get_chats():
     return {"chats": [{"id": c.get("id"), "title": c.get("title", "محادثة جديدة")} for c in history]}
@@ -139,7 +169,6 @@ def remove_chat_route(chat_id: str):
     save_history(history)
     return {"active_chat": active_chat}
 
-# Export
 @app.get("/chats/{chat_id}/export")
 def export_chat(chat_id: str, format: str = "markdown"):
     chat = get_chat(history, chat_id)
@@ -152,7 +181,6 @@ def export_chat(chat_id: str, format: str = "markdown"):
         lines.append(f"### {role}\n{msg.get('content', '')}\n")
     return JSONResponse(content={"title": title, "markdown": "\n".join(lines), "filename": f"perla_{chat_id[:8]}.md"})
 
-# Streaming Chat
 @app.post("/chat/stream")
 async def chat_stream(data: Message):
     message = data.message.strip()
@@ -169,6 +197,17 @@ async def chat_stream(data: Message):
     add_message(active_chat, "user", message)
     recent_history = get_recent_messages(active_chat, 20)
     task_type = router.choose(message=message)
+
+    if task_type in FILE_TASK_TYPES or task_type == IMAGE_TASK_TYPE:
+        if task_type in FILE_TASK_TYPES:
+            response, file_url = handle_file_generation(message, memory, recent_history, history, task_type)
+        else:
+            response, file_url = handle_image_generation(message)
+        add_message(active_chat, "assistant", response)
+        save_memory(memory); save_history(history)
+        async def file_stream():
+            yield "data: " + json.dumps({"type": "done", "content": response, "file_url": file_url, "chat_id": active_chat.get("id")}) + "\n\n"
+        return StreamingResponse(file_stream(), media_type="text/event-stream")
 
     if needs_planning(message, task_type):
         response = plan_task(message, memory)
@@ -219,7 +258,6 @@ async def chat_stream(data: Message):
 
     return StreamingResponse(generate(), media_type="text/event-stream")
 
-# Normal Chat
 @app.post("/chat")
 def chat(data: Message):
     message = data.message.strip()
@@ -233,16 +271,23 @@ def chat(data: Message):
     add_message(active_chat, "user", message)
     recent_history = get_recent_messages(active_chat, 20)
     task_type = router.choose(message=message)
-    auto_planned = needs_planning(message, task_type)
 
-    if auto_planned: response = plan_task(message, memory)
-    else: response = think(message, memory, recent_history, history_obj=history, task_type=task_type)
+    file_url = None
+    auto_planned = False
+
+    if task_type in FILE_TASK_TYPES:
+        response, file_url = handle_file_generation(message, memory, recent_history, history, task_type)
+    elif task_type == IMAGE_TASK_TYPE:
+        response, file_url = handle_image_generation(message)
+    else:
+        auto_planned = needs_planning(message, task_type)
+        if auto_planned: response = plan_task(message, memory)
+        else: response = think(message, memory, recent_history, history_obj=history, task_type=task_type)
 
     add_message(active_chat, "assistant", response)
     save_memory(memory); save_history(history)
-    return {"response": response, "chat_id": active_chat.get("id"), "planned": auto_planned}
+    return {"response": response, "chat_id": active_chat.get("id"), "planned": auto_planned, "file_url": file_url}
 
-# Planned Chat
 @app.post("/chat/plan")
 def chat_plan(data: Message):
     message = data.message.strip()
@@ -257,7 +302,6 @@ def chat_plan(data: Message):
     save_memory(memory); save_history(history)
     return {"response": response, "chat_id": active_chat.get("id")}
 
-# Multimodal (Image)
 @app.post("/chat/multimodal")
 async def multimodal_chat(message: str = Form(""), file: UploadFile | None = File(None)):
     message = message.strip()
@@ -287,7 +331,6 @@ async def multimodal_chat(message: str = Form(""), file: UploadFile | None = Fil
     save_memory(memory); save_history(history)
     return {"response": response, "chat_id": active_chat.get("id"), "file": file_info}
 
-# Audio Chat (Native - موديل يستقبل صوت مباشرة)
 @app.post("/chat/audio")
 async def audio_chat(message: str = Form(""), audio: UploadFile | None = File(None)):
     message = (message or "").strip()
@@ -317,7 +360,6 @@ async def audio_chat(message: str = Form(""), audio: UploadFile | None = File(No
     save_memory(memory); save_history(history)
     return {"response": response, "chat_id": active_chat.get("id"), "file": {"filename": filename, "content_type": content_type, "url": f"/uploads/{filename}"}}
 
-# Video Chat
 @app.post("/chat/video")
 async def video_chat(message: str = Form(""), video: UploadFile | None = File(None)):
     message = (message or "").strip()
@@ -347,10 +389,6 @@ async def video_chat(message: str = Form(""), video: UploadFile | None = File(No
     add_message(active_chat, "assistant", response)
     save_memory(memory); save_history(history)
     return {"response": response, "chat_id": active_chat.get("id"), "file": {"filename": filename, "content_type": content_type, "url": f"/uploads/{filename}"}}
-
-# =========================================================
-# VOICE ENDPOINTS (مجاني)
-# =========================================================
 
 @app.post("/stt")
 async def stt_endpoint(audio: UploadFile = File(...)):
@@ -479,7 +517,6 @@ async def chat_voice_stream(audio: UploadFile = File(...), message: str = Form("
 
     return StreamingResponse(generate(), media_type="text/event-stream")
 
-# Memory
 @app.get("/memory")
 def get_memory(): return {"memory": memory}
 
@@ -501,7 +538,6 @@ def delete_all_memory():
     memory.clear(); save_memory(memory)
     return {"success": True, "memory": []}
 
-# Reminders
 @app.post("/reminders")
 def create_reminder(data: ReminderItem):
     item = data.item.strip()
@@ -518,7 +554,6 @@ def due_reminders():
     if due: save_memory(memory)
     return {"reminders": [entry["text"] for entry in due]}
 
-# Global Error Handler
 @app.exception_handler(Exception)
 async def global_error_handler(request, exc):
     print("\n========== PERLA SERVER ERROR ==========")
